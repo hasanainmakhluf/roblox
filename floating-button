@@ -1,4 +1,4 @@
--- // SKRIP FINAL SINKRONISASI SEMPURNA: BEBAS MACET // --
+-- // SKRIP FINAL SINKRONISASI SEMPURNA: FIX POSITION BUG // --
 local UserInputService = game:GetService("UserInputService")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
@@ -36,8 +36,8 @@ local Stroke = Instance.new("UIStroke", MaxBtn)
 Stroke.Color = Color3.fromRGB(0, 255, 120) -- Hijau = Aktif
 Stroke.Thickness = 1.5
 
--- Fungsi pelacak Frame Utama NeverLose
-local function GetNeverLoseMainFrame()
+-- Fungsi pelacak Frame Utama & ScreenGui induk NeverLose
+local function GetNeverLoseElements()
     local targets = {CoreGui, LocalPlayer:WaitForChild("PlayerGui")}
     for _, location in pairs(targets) do
         for _, obj in pairs(location:GetDescendants()) do
@@ -45,14 +45,14 @@ local function GetNeverLoseMainFrame()
                 local current = obj
                 while current and current.Parent do
                     if current:IsA("Frame") and current.Parent:IsA("ScreenGui") then
-                        return current
+                        return current, current.Parent -- Mengembalikan MainFrame dan ScreenGui induknya
                     end
                     current = current.Parent
                 end
             end
         end
     end
-    return nil
+    return nil, nil
 end
 
 -- Fungsi Pembersih Kotak Kaca Fisik & Efek DOF
@@ -75,15 +75,14 @@ local function Clear3DGlassBoxes(shouldHide)
     end)
 end
 
--- State Tracker Utama (Mulai dengan kondisi true karena GUI terbuka di awal)
+-- State Tracker Utama
 local GuiVisible = true
 
--- // FUNGSI TOGGLE UTAMA: PAKSA KONDISI SECARA MUTLAK // --
+-- // FUNGSI TOGGLE UTAMA: AMAN & ANTI-GESER // --
 local function ActionToggle(forceState)
-    local MainFrame = GetNeverLoseMainFrame()
-    if not MainFrame then return end
+    local MainFrame, ParentGui = GetNeverLoseElements()
+    if not MainFrame or not ParentGui then return end
 
-    -- Jika ada forceState (dipicu lewat Insert), gunakan itu. Jika tidak (dipicu klik), balikkan nilainya.
     if forceState ~= nil then
         GuiVisible = forceState
     else
@@ -91,18 +90,22 @@ local function ActionToggle(forceState)
     end
 
     pcall(function()
+        -- KUNCI POSISI: Simpan posisi asli saat pertama kali ditemukan agar tidak bisa bergeser lagi
+        if not MainFrame:GetAttribute("FixedPosition") then
+            MainFrame:SetAttribute("FixedPosition", MainFrame.Position)
+        end
+
+        -- Selalu paksa posisi kembali ke posisi awal mula muncul (mengunci posisi)
+        MainFrame.Position = MainFrame:GetAttribute("FixedPosition")
+
         if not GuiVisible then
-            -- AKSI MINIMIZE: Paksa buang keluar layar & hancurkan kaca
-            if not MainFrame:GetAttribute("SavedPosition") then
-                MainFrame:SetAttribute("SavedPosition", MainFrame.Position)
-            end
-            MainFrame.Position = UDim2.new(0, -90000, 0, -90000)
+            -- AKSI MINIMIZE: Matikan visibility ScreenGui induk agar tidak bug/terpotong
+            ParentGui.Enabled = false
             Clear3DGlassBoxes(true)
             Stroke.Color = Color3.fromRGB(40, 40, 40) -- Abu-abu
         else
-            -- AKSI MAXIMIZE: Paksa panggil balik ke layar
-            local originalPos = MainFrame:GetAttribute("SavedPosition")
-            MainFrame.Position = originalPos or UDim2.new(0.5, -300, 0.5, -200)
+            -- AKSI MAXIMIZE: Hidupkan kembali ScreenGui induk
+            ParentGui.Enabled = true
             Clear3DGlassBoxes(false)
             Stroke.Color = Color3.fromRGB(0, 255, 120) -- Hijau
         end
@@ -111,17 +114,14 @@ end
 
 -- Trigger 1: Klik pada Tombol Floating di layar
 MaxBtn.MouseButton1Click:Connect(function()
-    ActionToggle() -- Menjalankan fungsi toggle biasa (membalikkan state)
+    ActionToggle()
 end)
 
 -- Trigger 2: Tekan tombol "Insert" pada Keyboard
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.KeyCode == Enum.KeyCode.Insert then
-        -- Begitu Insert ditekan, kita balikkan state internal kita secara paksa agar tetap sinkron
-        -- dengan tombol Insert milik NeverLose bawaan
         ActionToggle(not GuiVisible)
         
-        -- Efek visual kecil berkedip saat tombol merespon keyboard
         local originalColor = MaxBtn.BackgroundColor3
         MaxBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         task.wait(0.08)
@@ -129,4 +129,4 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     end
 end)
 
-print("Sistem Sinkronisasi Total Aktif! Bebas hambatan klik maupun keyboard.")
+print("Sistem Sinkronisasi Total Aktif! Posisi terkunci aman dari bug minimize.")
